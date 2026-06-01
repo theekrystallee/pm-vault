@@ -241,7 +241,13 @@ const NOTIFY_URL = 'https://xklifdhyxalvumkqerjs.supabase.co/functions/v1/notify
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const ALL_IPS = ["AESPA","ANGRY MOLLY","CARE BEARS","CHAKA","COCA-COLA","CRYBABY","DIMOO","DISNEY","DUCKOO","FIFA","HACIPUPU","HIRONO","MOLLY","MY LITTLE PONY","NYOTA","OTHER","PEACH RIOT","POLAR","POWERPUFF GIRLS","PUCKY","ROAR","SANRIO","SKULLPANDA","SPONGEBOB","STITCH","THE MONSTERS","TINY TINY","TWINKLE TWINKLE","YOKI","ZOOTOPIA","ZSIGA"];
+const ALL_IPS = [
+  "MOLLY","SKULLPANDA","THE MONSTERS","CRYBABY","DIMOO","PUCKY","Hirono",
+  "HACIPUPU","Twinkle Twinkle","POLAR","ROAR","Zsiga","CHAKA","YOKI",
+  "TINYTINY","NYOTA","Peach Riot","Angry Molly","DUCKOO",
+  "Stitch","SpongeBob","aespa","Disney","Sanrio","Care Bears",
+  "Powerpuff Girls","My Little Pony","Zootopia","FIFA","Coca-Cola","OTHER"
+];
 const TYPE_EMOJI = {figure:"🎭",plush:"🧸",accessory:"👜",display:"🖼️",cup:"🥤"};
 
 const SEED = [
@@ -642,8 +648,8 @@ function openAddModal(){
 function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
 async function saveItems(){
   let ip=document.getElementById('addIP').value;
-  if(ip==='__custom__')ip=document.getElementById('addCustomIP').value.trim().toUpperCase();
-  else ip=ip.toUpperCase();
+  if(ip==='__custom__')ip=document.getElementById('addCustomIP').value.trim();
+  else ip=ip; // preserve exact casing from dropdown
   if(!ip){toast('select an IP');return;}
   const series=document.getElementById('addSeries').value.trim();
   const valid=addRows.filter(r=>r.name.trim());
