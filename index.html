@@ -41,7 +41,10 @@
   .item-row.is-claimed{background:rgba(74,222,128,0.05);border-color:rgba(74,222,128,0.15)}
   .item-row.not-claimable{opacity:0.7}
   .item-name{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
-  .item-series{font-family:'Syne Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px}
+  .item-meta{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap}
+  .item-ip{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .item-sep{color:var(--dim);font-size:9px}
+  .item-series{font-family:'Syne Mono',monospace;font-size:10px;color:var(--muted)}
   .type-pill{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:4px;white-space:nowrap;text-transform:uppercase}
   .type-figure{background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.3)}
   .type-plush{background:rgba(236,72,153,0.12);color:#f9a8d4;border:1px solid rgba(236,72,153,0.3)}
@@ -136,6 +139,10 @@
     <select id="filterType" onchange="render()">
       <option value="ALL">all types</option>
       <option>figure</option><option>plush</option><option>accessory</option><option>display</option><option>cup</option>
+    </select>
+    <select id="filterDupes" onchange="render()">
+      <option value="ALL">all items</option>
+      <option value="DUPES">dupes only</option>
     </select>
     <select id="sortBy" onchange="render()">
       <option value="ip">sort: IP</option>
@@ -367,8 +374,9 @@ async function notify(payload){
 function buildStats(){
   const total=items.reduce((s,i)=>s+i.qty,0),ips=new Set(items.map(i=>i.ip)).size,
     figures=items.filter(i=>i.type==='figure').reduce((s,i)=>s+i.qty,0),
-    plush=items.filter(i=>i.type==='plush').reduce((s,i)=>s+i.qty,0);
-  document.getElementById('stats').innerHTML=[["pieces",total],["unique",items.length],["IPs",ips],["figures",figures],["plush",plush]]
+    plush=items.filter(i=>i.type==='plush').reduce((s,i)=>s+i.qty,0),
+    dupes=items.filter(i=>i.qty>1&&i.claimable!==false&&!claims[i.id]).length;
+  document.getElementById('stats').innerHTML=[["pieces",total],["unique",items.length],["IPs",ips],["figures",figures],["plush",plush],["up for claim",dupes]]
     .map(([l,v])=>`<div class="stat"><div class="stat-val">${v}</div><div class="stat-label">${l}</div></div>`).join('');
 }
 
@@ -383,11 +391,13 @@ function render(){
   const q=document.getElementById('search').value.toLowerCase(),
     ipF=document.getElementById('filterIP').value,
     typeF=document.getElementById('filterType').value,
+    dupesF=document.getElementById('filterDupes').value,
     sort=document.getElementById('sortBy').value;
   let filtered=[...items].filter(i=>{
-    if(q&&!i.name.toLowerCase().includes(q)&&!i.ip.toLowerCase().includes(q)&&!i.series.toLowerCase().includes(q))return false;
+    if(q&&!i.name.toLowerCase().includes(q)&&!i.ip.toLowerCase().includes(q)&&!i.series.toLowerCase().includes(q)&&!(i.short_name||'').toLowerCase().includes(q))return false;
     if(ipF!=='ALL'&&i.ip!==ipF)return false;
     if(typeF!=='ALL'&&i.type!==typeF)return false;
+    if(dupesF==='DUPES'&&!(i.qty>1&&i.claimable!==false&&!claims[i.id]))return false;
     return true;
   });
   filtered.sort((a,b)=>{
@@ -437,7 +447,14 @@ function makeRow(item){
     ?`<button class="toggle-claim-btn ${claimable?'on':'off'}" onclick="toggleClaimable('${item.id}')">${claimable?'claimable':'blocked'}</button><button class="delete-btn admin-only" onclick="deleteItem('${item.id}')">✕</button>`
     :`<span></span><span></span>`;
   row.innerHTML=`
-    <div><div class="item-name">${esc(item.name)}</div><div class="item-series">${esc(item.series)}</div></div>
+    <div>
+      <div class="item-name">${esc(item.short_name||item.name)}</div>
+      <div class="item-meta">
+        <span class="item-ip">${esc(item.ip)}</span>
+        <span class="item-sep">·</span>
+        <span class="item-series">${esc(item.series)}</span>
+      </div>
+    </div>
     <span class="type-pill type-${item.type}">${TYPE_EMOJI[item.type]||''} ${item.type}</span>
     ${claimCell}${qtyCell}${adminCells}`;
   return row;
@@ -610,13 +627,15 @@ function closeAddModal(){document.getElementById('addModal').classList.remove('o
 async function saveItems(){
   let ip=document.getElementById('addIP').value;
   if(ip==='__custom__')ip=document.getElementById('addCustomIP').value.trim().toUpperCase();
+  else ip=ip.toUpperCase();
   if(!ip){toast('select an IP');return;}
   const series=document.getElementById('addSeries').value.trim();
   const valid=addRows.filter(r=>r.name.trim());
   if(!valid.length){toast('add at least one item name');return;}
   const newItems=valid.map(r=>({
     id:`custom-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
-    name:series?`${series} – ${r.name.trim()}`:`${ip} – ${r.name.trim()}`,
+    name:series?`${ip} ${series} – ${r.name.trim()}`:`${ip} – ${r.name.trim()}`,
+    short_name:r.name.trim(),
     series:series||ip,ip,type:r.type,qty:parseInt(r.qty)||1,claimable:true
   }));
   showSaving();await db.from('items').insert(newItems);hideSaving();
@@ -637,3 +656,6 @@ loadData().then(()=>{
 </script>
 </body>
 </html>
+
+
+
