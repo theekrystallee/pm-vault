@@ -35,7 +35,7 @@
   .group-name{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--accent);white-space:nowrap}
   .group-count{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted)}
   .items-grid{display:flex;flex-direction:column;gap:2px;padding-bottom:80px}
-  .item-row{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid transparent;transition:background 0.15s,border-color 0.15s}
+  .item-row{display:grid;grid-template-columns:1fr auto auto auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid transparent;transition:background 0.15s,border-color 0.15s}
   .item-row:hover{background:rgba(124,58,237,0.06);border-color:var(--dim)}
   .item-row.is-dupe{background:rgba(180,124,255,0.06);border-color:rgba(180,124,255,0.15)}
   .item-row.is-claimed{background:rgba(74,222,128,0.05);border-color:rgba(74,222,128,0.15)}
@@ -375,8 +375,8 @@ function buildStats(){
   const total=items.reduce((s,i)=>s+i.qty,0),ips=new Set(items.map(i=>i.ip)).size,
     figures=items.filter(i=>i.type==='figure').reduce((s,i)=>s+i.qty,0),
     plush=items.filter(i=>i.type==='plush').reduce((s,i)=>s+i.qty,0),
-    dupes=items.filter(i=>i.qty>1&&i.claimable!==false&&!claims[i.id]).length;
-  document.getElementById('stats').innerHTML=[["pieces",total],["unique",items.length],["IPs",ips],["figures",figures],["plush",plush],["up for claim",dupes]]
+    claimQty=items.filter(i=>i.claimable!==false&&!claims[i.id]).reduce((s,i)=>s+Math.max(0,i.qty-(i.keep_min??1)),0);
+  document.getElementById('stats').innerHTML=[["pieces",total],["unique",items.length],["IPs",ips],["figures",figures],["plush",plush],["up for claim",claimQty]]
     .map(([l,v])=>`<div class="stat"><div class="stat-val">${v}</div><div class="stat-label">${l}</div></div>`).join('');
 }
 
@@ -397,7 +397,7 @@ function render(){
     if(q&&!i.name.toLowerCase().includes(q)&&!i.ip.toLowerCase().includes(q)&&!i.series.toLowerCase().includes(q)&&!(i.short_name||'').toLowerCase().includes(q))return false;
     if(ipF!=='ALL'&&i.ip!==ipF)return false;
     if(typeF!=='ALL'&&i.type!==typeF)return false;
-    if(dupesF==='DUPES'&&!(i.qty>1&&i.claimable!==false&&!claims[i.id]))return false;
+    if(dupesF==='DUPES'&&!(Math.max(0,i.qty-(i.keep_min??1))>0&&i.claimable!==false&&!claims[i.id]))return false;
     return true;
   });
   filtered.sort((a,b)=>{
@@ -422,7 +422,10 @@ function render(){
 }
 
 function makeRow(item){
-  const claim=claims[item.id],isDupe=item.qty>1,claimable=item.claimable!==false;
+  const claim=claims[item.id],claimable=item.claimable!==false;
+  const keepMin=item.keep_min??1;
+  const claimQty=Math.max(0,item.qty-keepMin);
+  const isDupe=claimQty>0;
   const row=document.createElement('div');
   let claimCell='<span></span>';
   if(claim&&claim.status==='accepted'){
@@ -436,7 +439,7 @@ function makeRow(item){
     claimCell=`<span class="rejected-badge">✕ ${claim.rejection_reason?esc(claim.rejection_reason):'not available'}</span>`;
   } else if(isDupe&&claimable){
     row.className='item-row is-dupe';
-    claimCell=`<button class="claim-btn" onclick="openClaimModal('${item.id}')">request dupe</button>`;
+    claimCell=`<button class="claim-btn" onclick="openClaimModal('${item.id}')">request dupe ×${claimQty}</button>`;
   } else {
     row.className='item-row';
   }
@@ -444,8 +447,15 @@ function makeRow(item){
     ?`<div class="qty-ctrl"><button class="qty-btn" onclick="adjustQty('${item.id}',-1)">−</button><span class="qty-num${item.qty===0?' zero':''}" onclick="editQty('${item.id}')">×${item.qty}</span><button class="qty-btn" onclick="adjustQty('${item.id}',1)">+</button></div>`
     :`<div class="qty-badge${item.qty===0?' zero':''}">×${item.qty}</div>`;
   const adminCells=isAdmin
-    ?`<button class="toggle-claim-btn ${claimable?'on':'off'}" onclick="toggleClaimable('${item.id}')">${claimable?'claimable':'blocked'}</button><button class="delete-btn admin-only" onclick="deleteItem('${item.id}')">✕</button>`
-    :`<span></span><span></span>`;
+    ?`<div style="display:flex;gap:6px;align-items:center">
+        <button class="toggle-claim-btn ${claimable?'on':'off'}" onclick="toggleClaimable('${item.id}')">${claimable?'claimable':'blocked'}</button>
+        <span style="font-family:'Syne Mono',monospace;font-size:9px;color:var(--muted)">keep</span>
+        <button class="qty-btn" onclick="adjustKeepMin('${item.id}',-1)">−</button>
+        <span style="font-family:'Syne Mono',monospace;font-size:11px;color:var(--accent);min-width:16px;text-align:center">${keepMin}</span>
+        <button class="qty-btn" onclick="adjustKeepMin('${item.id}',1)">+</button>
+        <button class="delete-btn" onclick="deleteItem('${item.id}')">✕</button>
+      </div>`
+    :`<span></span>`;
   row.innerHTML=`
     <div>
       <div class="item-name">${esc(item.short_name||item.name)}</div>
@@ -590,6 +600,12 @@ async function toggleClaimable(id){
   await db.from('items').update({claimable:val}).eq('id',id);hideSaving();
   item.claimable=val;render();
 }
+async function adjustKeepMin(id,delta){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  const val=Math.max(0,Math.min(item.qty,(item.keep_min??1)+delta));showSaving();
+  await db.from('items').update({keep_min:val}).eq('id',id);hideSaving();
+  item.keep_min=val;render();
+}
 async function deleteItem(id){
   const item=items.find(i=>i.id===id);
   if(!confirm(`remove "${item.name}"?`))return;
@@ -656,6 +672,3 @@ loadData().then(()=>{
 </script>
 </body>
 </html>
-
-
-
