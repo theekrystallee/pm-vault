@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Krystal's Pop Mart Collection</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#08070f;--border:#1e1630;--accent:#b47cff;--text:#e8e0f8;--muted:#6b5a8a;--dim:#2a1e42;--red:#E8002D}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 10% 10%,rgba(100,40,180,0.12) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 90% 80%,rgba(180,40,120,0.08) 0%,transparent 60%);pointer-events:none;z-index:0}
+  .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 24px}
+  header{padding:48px 0 32px;border-bottom:1px solid var(--border)}
+  .header-inner{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:24px}
+  .brand-label{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+  h1{font-size:clamp(32px,6vw,60px);font-weight:800;line-height:0.9;letter-spacing:-2px}
+  .subtitle{margin-top:10px;font-family:'Syne Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--muted)}
+  .saving{color:var(--accent);margin-left:8px;display:none}
+  .stats{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{background:rgba(180,124,255,0.07);border:1px solid var(--dim);border-radius:10px;padding:12px 18px;text-align:center;min-width:72px}
+  .stat-val{font-size:22px;font-weight:800;color:var(--accent);line-height:1}
+  .stat-label{font-family:'Syne Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .controls{padding:20px 0 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .search-wrap{position:relative;flex:1 1 220px}
+  .search-wrap input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--dim);border-radius:8px;padding:9px 14px 9px 36px;color:var(--text);font-family:'Syne Mono',monospace;font-size:12px;outline:none}
+  .search-wrap input:focus{border-color:var(--accent)}
+  .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+  select{background:#0f0d1a;border:1px solid var(--dim);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Syne Mono',monospace;font-size:11px;outline:none;cursor:pointer}
+  select:focus{border-color:var(--accent)}
+  .result-count{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--muted);padding:10px 0 6px}
+  .group-header{display:flex;align-items:center;gap:12px;padding:18px 0 6px}
+  .group-line{flex:1;height:1px;background:var(--dim)}
+  .group-name{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--accent);white-space:nowrap}
+  .group-count{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted)}
+  .items-grid{display:flex;flex-direction:column;gap:2px;padding-bottom:80px}
+  .item-row{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid transparent;transition:background 0.15s,border-color 0.15s}
+  .item-row:hover{background:rgba(124,58,237,0.06);border-color:var(--dim)}
+  .item-row.is-dupe{background:rgba(180,124,255,0.06);border-color:rgba(180,124,255,0.15)}
+  .item-row.is-claimed{background:rgba(74,222,128,0.05);border-color:rgba(74,222,128,0.15)}
+  .item-row.not-claimable{opacity:0.7}
+  .item-name{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
+  .item-series{font-family:'Syne Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px}
+  .type-pill{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:4px;white-space:nowrap;text-transform:uppercase}
+  .type-figure{background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.3)}
+  .type-plush{background:rgba(236,72,153,0.12);color:#f9a8d4;border:1px solid rgba(236,72,153,0.3)}
+  .type-accessory{background:rgba(14,165,233,0.12);color:#7dd3fc;border:1px solid rgba(14,165,233,0.3)}
+  .type-display{background:rgba(245,158,11,0.12);color:#fcd34d;border:1px solid rgba(245,158,11,0.3)}
+  .type-cup{background:rgba(20,184,166,0.12);color:#5eead4;border:1px solid rgba(20,184,166,0.3)}
+  .qty-badge{font-family:'Syne Mono',monospace;font-size:13px;font-weight:700;color:var(--accent);min-width:28px;text-align:right}
+  .qty-badge.zero{color:var(--muted)}
+  .claim-btn{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:transparent;cursor:pointer;white-space:nowrap}
+  .claim-btn:hover{background:var(--accent);color:#fff}
+  .claimed-badge{font-family:'Syne Mono',monospace;font-size:9px;padding:4px 10px;border-radius:4px;background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25);white-space:nowrap}
+  .pending-badge{font-family:'Syne Mono',monospace;font-size:9px;padding:4px 10px;border-radius:4px;background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);white-space:nowrap}
+  .rejected-badge{font-family:'Syne Mono',monospace;font-size:9px;padding:4px 10px;border-radius:4px;background:rgba(248,113,113,0.1);color:#f87171;border:1px solid rgba(248,113,113,0.25);white-space:nowrap}
+  .qty-ctrl{display:flex;gap:6px;align-items:center}
+  .qty-btn{background:rgba(255,255,255,0.04);border:1px solid var(--dim);border-radius:3px;width:20px;height:20px;color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+  .qty-num{min-width:28px;text-align:center;color:#f0e6ff;font-weight:700;font-size:14px;cursor:pointer;border-bottom:1px dashed var(--dim);font-family:'Syne Mono',monospace}
+  .qty-num.zero{color:var(--muted)}
+  .delete-btn{background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:2px}
+  .delete-btn:hover{color:#ef4444}
+  .toggle-claim-btn{font-family:'Syne Mono',monospace;font-size:8px;letter-spacing:1px;padding:3px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;border:1px solid var(--dim);background:transparent;color:var(--muted)}
+  .toggle-claim-btn.on{border-color:rgba(74,222,128,0.4);color:#4ade80}
+  .toggle-claim-btn.off{border-color:rgba(248,113,113,0.4);color:#f87171}
+  .admin-only{display:none}
+  body.is-admin .admin-only{display:flex}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:#13101f;border-radius:14px;padding:28px;width:90%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,0.6);border-top:3px solid var(--accent);max-height:90vh;overflow-y:auto}
+  .modal h3{font-size:16px;font-weight:800;margin-bottom:4px;color:var(--text)}
+  .modal-sub{font-family:'Syne Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:18px}
+  .field-label{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
+  .modal input,.modal select,.modal textarea{width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--dim);border-radius:8px;padding:10px 14px;font-family:'Syne',sans-serif;font-size:14px;outline:none;color:var(--text);margin-bottom:10px}
+  .modal textarea{resize:vertical;min-height:80px}
+  .modal input:focus,.modal select:focus,.modal textarea:focus{border-color:var(--accent)}
+  .modal-btns{display:flex;gap:10px;margin-top:14px}
+  .btn-primary{flex:1;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+  .btn-primary:hover{background:#9d63e8}
+  .btn-ghost{flex:1;background:transparent;color:var(--muted);border:1px solid var(--dim);border-radius:8px;padding:10px;font-family:'Syne',sans-serif;font-size:13px;cursor:pointer}
+  .divider{height:1px;background:var(--dim);margin:14px 0}
+  .add-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+  .add-row input,.add-row select{margin-bottom:0;flex:1 1 160px}
+  .add-row .qty-input{flex:0 0 60px}
+  .add-row .type-sel{flex:0 0 110px}
+  .add-row-btn{background:transparent;border:1px solid var(--accent);border-radius:8px;padding:7px 14px;color:var(--accent);font-family:'Syne Mono',monospace;font-size:11px;cursor:pointer;letter-spacing:1px}
+  .row-x{background:transparent;border:1px solid var(--dim);border-radius:6px;padding:6px 10px;color:var(--muted);cursor:pointer;font-size:12px;flex:0}
+  .pw-error{font-family:'Syne Mono',monospace;font-size:10px;color:var(--red);margin-top:4px;text-align:center}
+  .request-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .request-card.accepted{background:rgba(74,222,128,0.07);border-color:rgba(74,222,128,0.2)}
+  .request-card.rejected{background:rgba(248,113,113,0.07);border-color:rgba(248,113,113,0.2);opacity:0.8}
+  .req-item{font-size:13px;font-weight:700;color:var(--text)}
+  .req-name{font-family:'Syne Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px}
+  .req-time{font-family:'Syne Mono',monospace;font-size:9px;color:var(--dim);margin-top:2px}
+  .btn-accept{background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-family:'Syne Mono',monospace;font-size:10px;cursor:pointer}
+  .btn-reject{background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:6px 14px;font-family:'Syne Mono',monospace;font-size:10px;cursor:pointer}
+  .btn-reject:hover{background:var(--accent);color:#fff}
+  .section-head{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--muted);margin:18px 0 10px;text-transform:uppercase}
+  .no-requests{font-family:'Syne Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding:40px 0;letter-spacing:2px}
+  .admin-trigger{position:fixed;bottom:20px;right:20px;background:transparent;border:none;color:var(--dim);font-size:10px;font-family:'Syne Mono',monospace;letter-spacing:2px;cursor:pointer;z-index:50;padding:6px}
+  .admin-trigger:hover{color:var(--muted)}
+  body.is-admin .admin-trigger{color:var(--accent)}
+  footer{position:fixed;bottom:0;left:0;right:0;background:rgba(8,7,15,0.9);backdrop-filter:blur(12px);border-top:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;justify-content:center;gap:8px;z-index:10}
+  .footer-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+  .footer-text{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+  .empty{text-align:center;padding:80px 0;font-family:'Syne Mono',monospace;font-size:12px;letter-spacing:3px;color:var(--muted)}
+  .toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%) translateY(20px);background:#111;color:#fff;font-family:'Syne Mono',monospace;font-size:11px;padding:10px 20px;border-radius:20px;opacity:0;transition:opacity 0.3s,transform 0.3s;z-index:999;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'Syne Mono',monospace;color:var(--muted);letter-spacing:3px;font-size:12px}
+</style>
+</head>
+<body>
+
+<div id="loadingScreen" class="loading-screen">LOADING VAULT…</div>
+
+<div id="app" style="display:none">
+<div class="wrap">
+  <header>
+    <div class="header-inner">
+      <div>
+        <div class="brand-label">krystal's collection</div>
+        <h1>KRYSTAL'S <span style="color:#E8002D">POP MART</span><br>COLLECTION</h1>
+        <div class="subtitle">dupes open for request to claim<span class="saving" id="savingPill"> · saving…</span></div>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </header>
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search" placeholder="search name, ip, series…" oninput="render()"/>
+    </div>
+    <select id="filterIP" onchange="render()"><option value="ALL">all IPs</option></select>
+    <select id="filterType" onchange="render()">
+      <option value="ALL">all types</option>
+      <option>figure</option><option>plush</option><option>accessory</option><option>display</option><option>cup</option>
+    </select>
+    <select id="sortBy" onchange="render()">
+      <option value="ip">sort: IP</option>
+      <option value="name">sort: name</option>
+      <option value="qty">sort: qty ↓</option>
+      <option value="type">sort: type</option>
+    </select>
+    <button class="btn-primary admin-only" id="addBtn" onclick="openAddModal()" style="padding:9px 16px;font-size:11px;font-family:'Syne Mono',monospace;letter-spacing:1px;flex:0">+ ADD</button>
+  </div>
+  <div class="result-count" id="count"></div>
+  <div class="items-grid" id="list"></div>
+</div>
+</div>
+
+<!-- Claim Modal -->
+<div class="modal-overlay" id="claimModal" onclick="if(event.target===this)closeClaimModal()">
+  <div class="modal">
+    <h3 id="claimModalTitle">Request a Dupe</h3>
+    <div class="modal-sub">leave your name and email to request this item</div>
+    <div class="field-label">your name *</div>
+    <input type="text" id="claimName" placeholder="your name" maxlength="60"/>
+    <div class="field-label">your email *</div>
+    <input type="email" id="claimEmail" placeholder="your@email.com"/>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeClaimModal()">cancel</button>
+      <button class="btn-primary" onclick="submitClaim()">send request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Reason Modal -->
+<div class="modal-overlay" id="rejectModal" onclick="if(event.target===this)closeRejectModal()">
+  <div class="modal">
+    <h3>Reject Request</h3>
+    <div class="modal-sub">leave a reason (optional) — the requester will see this</div>
+    <div class="field-label">reason</div>
+    <textarea id="rejectReason" placeholder="e.g. already promised to someone else"></textarea>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeRejectModal()">cancel</button>
+      <button class="btn-primary" onclick="confirmReject()" style="background:#ef4444">reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal" style="max-width:560px">
+    <h3>Add Items</h3>
+    <div class="modal-sub">add multiple items from the same series at once</div>
+    <div class="field-label">ip *</div>
+    <select id="addIP" onchange="toggleCustomIP()">
+      <option value="">— select ip —</option>
+    </select>
+    <input type="text" id="addCustomIP" placeholder="custom IP name" style="display:none"/>
+    <div class="field-label">series</div>
+    <input type="text" id="addSeries" placeholder="e.g. PUCKY Dreamy Wishes"/>
+    <div class="divider"></div>
+    <div class="field-label">items</div>
+    <div id="addRowsContainer"></div>
+    <button class="add-row-btn" onclick="addRow()">+ add another</button>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeAddModal()">cancel</button>
+      <button class="btn-primary" onclick="saveItems()">save all</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Modal -->
+<div class="modal-overlay" id="adminModal" onclick="if(event.target===this)closeAdmin()">
+  <div class="modal" style="max-width:680px">
+    <h3>⚙ Admin</h3>
+    <div class="modal-sub" id="adminSub">enter password to unlock</div>
+    <div id="adminContent">
+      <input type="password" id="adminPw" placeholder="password" onkeydown="if(event.key==='Enter')checkPw()"/>
+      <div class="modal-btns">
+        <button class="btn-ghost" onclick="closeAdmin()">cancel</button>
+        <button class="btn-primary" onclick="checkPw()">unlock</button>
+      </div>
+      <div class="pw-error" id="pwError"></div>
+    </div>
+  </div>
+</div>
+
+<button class="admin-trigger" onclick="openAdmin()">admin</button>
+<footer>
+  <div class="footer-dot"></div>
+  <div class="footer-text">krystal's pop mart collection</div>
+  <div class="footer-dot" style="animation-delay:0.6s"></div>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://xklifdhyxalvumkqerjs.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_w1dVqDWVIj4T2m6lmEfNAQ_atOgdypP';
+const NOTIFY_URL = 'https://xklifdhyxalvumkqerjs.supabase.co/functions/v1/notify';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const ALL_IPS = ["AESPA","ANGRY MOLLY","CARE BEARS","CHAKA","COCA-COLA","CRYBABY","DIMOO","DISNEY","DUCKOO","FIFA","HACIPUPU","HIRONO","MOLLY","MY LITTLE PONY","NYOTA","OTHER","PEACH RIOT","POLAR","POWERPUFF GIRLS","PUCKY","ROAR","SANRIO","SKULLPANDA","SPONGEBOB","STITCH","THE MONSTERS","TINY TINY","TWINKLE TWINKLE","YOKI","ZOOTOPIA","ZSIGA"];
+const TYPE_EMOJI = {figure:"🎭",plush:"🧸",accessory:"👜",display:"🖼️",cup:"🥤"};
+
+const SEED = [
+  {id:"sp-mlp",name:"SKULLPANDA × My Little Pony Series Plush Doll Pendant",series:"SKULLPANDA × My Little Pony",ip:"SKULLPANDA",type:"plush",qty:1,claimable:true},
+  {id:"sp-impress",name:"SKULLPANDA L'impressionnisme Series Plush Doll",series:"SKULLPANDA L'impressionnisme",ip:"SKULLPANDA",type:"plush",qty:1,claimable:true},
+  {id:"sp-yfm",name:"SKULLPANDA You Found Me! Series Plush Doll Pendant",series:"SKULLPANDA You Found Me!",ip:"SKULLPANDA",type:"plush",qty:1,claimable:true},
+  {id:"sp-rattybear",name:"SKULLPANDA You Found Me! – Ratty Bear",series:"SKULLPANDA You Found Me!",ip:"SKULLPANDA",type:"plush",qty:1,claimable:true},
+  {id:"sp-ior-duality",name:"SKULLPANDA Image of Reality – The Duality (White)",series:"SKULLPANDA Image of Reality",ip:"SKULLPANDA",type:"figure",qty:1,claimable:true},
+  {id:"sp-sound",name:"SKULLPANDA The Sound Series Figure",series:"SKULLPANDA The Sound",ip:"SKULLPANDA",type:"figure",qty:1,claimable:true},
+  {id:"sp-sound-awe",name:"SKULLPANDA The Sound Series – The Awe",series:"SKULLPANDA The Sound",ip:"SKULLPANDA",type:"figure",qty:1,claimable:true},
+  {id:"sp-feast-knife",name:"SKULLPANDA The Feast Begins – The Dinner Knife",series:"SKULLPANDA The Feast Begins",ip:"SKULLPANDA",type:"figure",qty:1,claimable:true},
+  {id:"sp-feat-begins",name:"SKULLPANDA The Feast Begins Series Figures",series:"SKULLPANDA The Feast Begins",ip:"SKULLPANDA",type:"figure",qty:1,claimable:true},
+  {id:"mac-soymilk",name:"THE MONSTERS Exciting Macaron Vinyl Face – Soymilk",series:"THE MONSTERS Exciting Macaron",ip:"THE MONSTERS",type:"plush",qty:1,claimable:true},
+  {id:"mac-lychee",name:"THE MONSTERS Exciting Macaron Vinyl Face – Lychee Berry",series:"THE MONSTERS Exciting Macaron",ip:"THE MONSTERS",type:"plush",qty:1,claimable:true},
+  {id:"bie-luck",name:"THE MONSTERS Big into Energy Vinyl Plush – Luck",series:"THE MONSTERS Big into Energy",ip:"THE MONSTERS",type:"plush",qty:1,claimable:true},
+  {id:"bie-happy",name:"THE MONSTERS Big into Energy Vinyl Plush – Happiness",series:"THE MONSTERS Big into Energy",ip:"THE MONSTERS",type:"plush",qty:1,claimable:true},
+  {id:"mon-orig",name:"THE MONSTERS Original Plush Doll",series:"THE MONSTERS",ip:"THE MONSTERS",type:"plush",qty:2,claimable:true},
+  {id:"lab-bag",name:"Classic Bag Series – LABUBU Reversible Plush Bag",series:"THE MONSTERS Classic Bag",ip:"THE MONSTERS",type:"accessory",qty:3,claimable:true},
+  {id:"monsters-cola-cool",name:"THE MONSTERS Coca-Cola Series – Time to Cool Down",series:"THE MONSTERS Coca-Cola",ip:"THE MONSTERS",type:"figure",qty:2,claimable:true},
+  {id:"monsters-cola-surp",name:"THE MONSTERS Coca-Cola Series – Super Surprise",series:"THE MONSTERS Coca-Cola",ip:"THE MONSTERS",type:"figure",qty:1,claimable:true},
+  {id:"mon-yoga-americano",name:"THE MONSTERS Lazy Yoga – Americano",series:"THE MONSTERS Lazy Yoga",ip:"THE MONSTERS",type:"figure",qty:1,claimable:true},
+  {id:"mon-yoga-showoff",name:"THE MONSTERS Lazy Yoga – Show Off",series:"THE MONSTERS Lazy Yoga",ip:"THE MONSTERS",type:"figure",qty:1,claimable:true},
+  {id:"mon-yoga-confident",name:"THE MONSTERS Lazy Yoga – Confident",series:"THE MONSTERS Lazy Yoga",ip:"THE MONSTERS",type:"figure",qty:1,claimable:true},
+  {id:"mon-fifa-plush",name:"THE MONSTERS FIFA Plush Pendant",series:"THE MONSTERS × FIFA",ip:"THE MONSTERS",type:"plush",qty:1,claimable:true},
+  {id:"mon-cola-surf",name:"THE MONSTERS Coca-Cola – Surf with Me",series:"THE MONSTERS Coca-Cola",ip:"THE MONSTERS",type:"figure",qty:1,claimable:true},
+  {id:"mon-cola-snowy",name:"THE MONSTERS Coca-Cola – Snowy Mountain",series:"THE MONSTERS Coca-Cola",ip:"THE MONSTERS",type:"figure",qty:1,claimable:true},
+  {id:"hagr-molly",name:"Have a Good Run Series – Molly Plush Pendant",series:"Have a Good Run (Multi-IP)",ip:"MOLLY",type:"plush",qty:1,claimable:true},
+  {id:"molly-card",name:"Molly Magic Mint Card Holder Pendant",series:"MOLLY Daily Look Series",ip:"MOLLY",type:"accessory",qty:1,claimable:true},
+  {id:"molly-zootopia",name:"MOLLY × Zootopia Series – Flash",series:"MOLLY × Zootopia",ip:"MOLLY",type:"figure",qty:1,claimable:true},
+  {id:"dimoo-stc",name:"DIMOO The Secret Theatre Club Series Vinyl Plush Pendant",series:"DIMOO The Secret Theatre Club",ip:"DIMOO",type:"plush",qty:1,claimable:true},
+  {id:"dimoo-hum",name:"DIMOO Animal Kingdom Series – Humidifier",series:"DIMOO Animal Kingdom",ip:"DIMOO",type:"display",qty:1,claimable:true},
+  {id:"dimoo-disney-mug",name:"DIMOO × Disney Popcorn Ceramic Mug",series:"DIMOO × Disney Popcorn",ip:"DIMOO",type:"display",qty:1,claimable:true},
+  {id:"haci-snug",name:"HACIPUPU Snuggle with You Series Blind Box Figure",series:"HACIPUPU Snuggle with You",ip:"HACIPUPU",type:"figure",qty:1,claimable:true},
+  {id:"haci-gem",name:"HACIPUPU The Constellation – Gemini Vinyl Plush",series:"HACIPUPU The Constellation",ip:"HACIPUPU",type:"plush",qty:1,claimable:true},
+  {id:"haci-lib",name:"HACIPUPU The Constellation – Libra Vinyl Plush",series:"HACIPUPU The Constellation",ip:"HACIPUPU",type:"plush",qty:1,claimable:true},
+  {id:"cry-tv",name:"CRYBABY × Powerpuff Girls – TV Set Luminous Display",series:"CRYBABY × Powerpuff Girls",ip:"CRYBABY",type:"display",qty:1,claimable:true},
+  {id:"cry-sad",name:"CRYBABY Sad Club Series – Plush Figure",series:"CRYBABY Sad Club",ip:"CRYBABY",type:"plush",qty:3,claimable:true},
+  {id:"cry-scene",name:"CRYBABY Sad Club Series – Scene Sets",series:"CRYBABY Sad Club",ip:"CRYBABY",type:"display",qty:1,claimable:true},
+  {id:"cry-cheer",name:"CRYBABY Cheer Up, Baby! – Plush Doll",series:"CRYBABY Cheer Up, Baby!",ip:"CRYBABY",type:"plush",qty:1,claimable:true},
+  {id:"cry-shiny-plush",name:"CRYBABY Shiny Shiny Series Plush Doll",series:"CRYBABY Shiny Shiny",ip:"CRYBABY",type:"plush",qty:1,claimable:true},
+  {id:"cry-ocean-turtle",name:"CRYBABY Cry Me an Ocean – The Sea Turtle",series:"CRYBABY Cry Me an Ocean",ip:"CRYBABY",type:"figure",qty:1,claimable:true},
+  {id:"cry-ocean-manta",name:"CRYBABY Cry Me an Ocean – The Manta Ray",series:"CRYBABY Cry Me an Ocean",ip:"CRYBABY",type:"figure",qty:1,claimable:true},
+  {id:"cry-ocean-angler",name:"CRYBABY Cry Me an Ocean – The Anglerfish",series:"CRYBABY Cry Me an Ocean",ip:"CRYBABY",type:"figure",qty:1,claimable:true},
+  {id:"cry-again-manta",name:"CRYBABY Crying Again – The Manta Ray",series:"CRYBABY Crying Again",ip:"CRYBABY",type:"figure",qty:1,claimable:true},
+  {id:"cry-again-puffer",name:"CRYBABY Crying Again – The Puffer Fish",series:"CRYBABY Crying Again",ip:"CRYBABY",type:"figure",qty:2,claimable:true},
+  {id:"cry-again-narwhal",name:"CRYBABY Crying Again – The Narwhal",series:"CRYBABY Crying Again",ip:"CRYBABY",type:"figure",qty:2,claimable:true},
+  {id:"cry-again-turtle",name:"CRYBABY Crying Again – The Sea Turtle",series:"CRYBABY Crying Again",ip:"CRYBABY",type:"figure",qty:1,claimable:true},
+  {id:"cry-again-seabunny",name:"CRYBABY Crying Again – The Sea Bunny",series:"CRYBABY Crying Again",ip:"CRYBABY",type:"figure",qty:1,claimable:true},
+  {id:"cry-again-magnet-manta",name:"CRYBABY Crying Again – Fridge Magnet: Manta Ray",series:"CRYBABY Crying Again",ip:"CRYBABY",type:"accessory",qty:1,claimable:true},
+  {id:"tw-neck",name:"Twinkle Twinkle Crush On You – Neck Pillow",series:"Twinkle Twinkle Crush On You",ip:"TWINKLE TWINKLE",type:"accessory",qty:1,claimable:true},
+  {id:"tw-pillow",name:"Twinkle Twinkle Crush On You – Plush Pillow",series:"Twinkle Twinkle Crush On You",ip:"TWINKLE TWINKLE",type:"plush",qty:2,claimable:true},
+  {id:"tw-card",name:"Twinkle Twinkle Crush On You – Card Holder Pendant",series:"Twinkle Twinkle Crush On You",ip:"TWINKLE TWINKLE",type:"accessory",qty:3,claimable:true},
+  {id:"tw-alba",name:"Twinkle Twinkle Crush On You – Albatross's Vow Figure",series:"Twinkle Twinkle Crush On You",ip:"TWINKLE TWINKLE",type:"figure",qty:1,claimable:true},
+  {id:"tw-snow",name:"Twinkle Twinkle Sweet Dreams Forecast – Hug from Snowman",series:"Twinkle Twinkle Sweet Dreams Forecast",ip:"TWINKLE TWINKLE",type:"plush",qty:1,claimable:true},
+  {id:"tw-mg-purple",name:"Twinkle Twinkle Moon Gelato – Purple Potato Gelato",series:"Twinkle Twinkle Moon Gelato",ip:"TWINKLE TWINKLE",type:"plush",qty:1,claimable:true},
+  {id:"tw-mg-strawberry",name:"Twinkle Twinkle Moon Gelato – Strawberry Guava Gelato",series:"Twinkle Twinkle Moon Gelato",ip:"TWINKLE TWINKLE",type:"plush",qty:2,claimable:true},
+  {id:"pk-circus",name:"PUCKY Elf Circus Acrobatic Baby Blister Pack",series:"PUCKY Circus Acrobatics Baby",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-sci",name:"PUCKY Planet Explorer – Scientist Baby",series:"PUCKY Planet Explorer",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-xmas",name:"PUCKY Merry Christmas Set (2019)",series:"PUCKY Merry Christmas",ip:"PUCKY",type:"display",qty:1,claimable:true},
+  {id:"pk-feast",name:"PUCKY The Feast Series – Dinner Set",series:"PUCKY The Feast",ip:"PUCKY",type:"display",qty:2,claimable:true},
+  {id:"pk-dw-fortune",name:"PUCKY Dreamy Wishes – Wish of Fortune",series:"PUCKY Dreamy Wishes",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-dw-owl",name:"PUCKY Dreamy Wishes – Wisdom of the Owl",series:"PUCKY Dreamy Wishes",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-dw-wings",name:"PUCKY Dreamy Wishes – Wings of Beauty",series:"PUCKY Dreamy Wishes",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-dw-gargoyle",name:"PUCKY Dreamy Wishes – The Guardian Gargoyle",series:"PUCKY Dreamy Wishes",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-dw-ladybug",name:"PUCKY Dreamy Wishes – Luck of the Ladybug",series:"PUCKY Dreamy Wishes",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"pk-fp-leaf",name:"PUCKY Forest Party Vinyl Plush Pendant – Leaf Baby",series:"PUCKY Forest Party",ip:"PUCKY",type:"plush",qty:1,claimable:true},
+  {id:"pk-beans",name:"PUCKY Beans",series:"PUCKY Beans",ip:"PUCKY",type:"plush",qty:2,claimable:true},
+  {id:"pk-15th",name:"PUCKY 15th Anniversary Figure",series:"PUCKY 15th Anniversary",ip:"PUCKY",type:"figure",qty:1,claimable:true},
+  {id:"gallop-spring-joy",name:"The Golden Gallop – Spring Joy",series:"The Golden Gallop",ip:"TINY TINY",type:"figure",qty:1,claimable:true},
+  {id:"tinytiny-freedom",name:"TINYTINY The Lie of Freedom Figure",series:"TINYTINY The Lie of Freedom",ip:"TINY TINY",type:"figure",qty:1,claimable:true},
+  {id:"gallop-nyota",name:"The Golden Gallop – Nyota (Pegasus Unbound)",series:"The Golden Gallop",ip:"NYOTA",type:"figure",qty:1,claimable:true},
+  {id:"polar-nmenber",name:"POLAR Season 3 Monster Village – Nmenber",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"polar-erios",name:"POLAR Season 3 Monster Village – Erios",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"polar-leeboo",name:"POLAR Season 3 Monster Village – Leeboo",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:2,claimable:true},
+  {id:"polar-gambit",name:"POLAR Season 3 Monster Village – Gambit",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"polar-mingoo",name:"POLAR Season 3 Monster Village – Mingoo",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"polar-dingo",name:"POLAR Season 3 Monster Village – Dingo",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"polar-cooper",name:"POLAR Season 3 Monster Village – Cooper",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"polar-villio",name:"POLAR Season 3 Monster Village – Villio",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:2,claimable:true},
+  {id:"polar-snuggo",name:"POLAR Season 3 Monster Village – Snuggo",series:"POLAR Season 3 Polar In Monster Village",ip:"POLAR",type:"figure",qty:1,claimable:true},
+  {id:"aespa-giselle",name:"aespa Fluffy Club – GELBULNYANGI (Giselle Ver.)",series:"aespa × POP MART Fluffy Club",ip:"AESPA",type:"plush",qty:2,claimable:true},
+  {id:"aespa-ningning",name:"aespa Fluffy Club – RWE (Ningning Ver.)",series:"aespa × POP MART Fluffy Club",ip:"AESPA",type:"plush",qty:1,claimable:true},
+  {id:"aespa-lanyard-giselle",name:"aespa Phone Lanyard – Giselle",series:"aespa × POP MART",ip:"AESPA",type:"accessory",qty:1,claimable:true},
+  {id:"zsiga-cb",name:"ZSIGA × Care Bears Series Figures",series:"ZSIGA × Care Bears",ip:"ZSIGA",type:"figure",qty:1,claimable:true},
+  {id:"zsiga-sun-hurry",name:"ZSIGA Under the Sun – Hurry",series:"ZSIGA Under the Sun",ip:"ZSIGA",type:"figure",qty:1,claimable:true},
+  {id:"roar-yuki",name:"ROAR YUKI Luminous Plush – Purple",series:"ROAR YUKI Luminous",ip:"ROAR",type:"plush",qty:2,claimable:true},
+  {id:"angry-red",name:"Angry Molly Angry Energy – Red Fire Plush Pendant",series:"Angry Molly Angry Energy",ip:"ANGRY MOLLY",type:"plush",qty:1,claimable:true},
+  {id:"hirono-mc-clown",name:"Hirono Monsters Carnival – Creepy Clown",series:"Hirono Monsters Carnival",ip:"HIRONO",type:"figure",qty:1,claimable:true},
+  {id:"hirono-lpp-lamp",name:"Hirono Le Petit Prince – The Lamplighter",series:"Hirono Le Petit Prince",ip:"HIRONO",type:"figure",qty:1,claimable:true},
+  {id:"hirono-lpp-prince",name:"Hirono Le Petit Prince – The Little Prince",series:"Hirono Le Petit Prince",ip:"HIRONO",type:"figure",qty:1,claimable:true},
+  {id:"hirono-sachet",name:"Hirono Wellpharmacy – Worry-relieving Sachet Pendant",series:"Hirono Wellpharmacy",ip:"HIRONO",type:"accessory",qty:2,claimable:true},
+  {id:"duckoo",name:"DUCKOO Gym Bag (GWP)",series:"DUCKOO",ip:"DUCKOO",type:"accessory",qty:7,claimable:true},
+  {id:"stitch-howl",name:"Stitch Little Emotions – Howl at the Moon",series:"Stitch Little Emotions",ip:"STITCH",type:"figure",qty:1,claimable:true},
+  {id:"spongeb-mail",name:"SpongeBob Bikini Bottom 2 – Mail Fish",series:"SpongeBob Bikini Bottom 2",ip:"SPONGEBOB",type:"figure",qty:1,claimable:true},
+  {id:"spongeb-mascot",name:"SpongeBob Bikini Bottom 2 – Mascot Fish",series:"SpongeBob Bikini Bottom 2",ip:"SPONGEBOB",type:"figure",qty:1,claimable:true},
+  {id:"spongeb-crutch",name:"SpongeBob Bikini Bottom 2 – Crutch Fish",series:"SpongeBob Bikini Bottom 2",ip:"SPONGEBOB",type:"figure",qty:1,claimable:true},
+  {id:"spongeb-bully",name:"SpongeBob Bikini Bottom 2 – Bully Fish",series:"SpongeBob Bikini Bottom 2",ip:"SPONGEBOB",type:"figure",qty:1,claimable:true},
+  {id:"spongeb-scientist",name:"SpongeBob Bikini Bottom 2 – Scientist Fish",series:"SpongeBob Bikini Bottom 2",ip:"SPONGEBOB",type:"figure",qty:1,claimable:true},
+  {id:"spongeb-explorer",name:"SpongeBob Bikini Bottom 2 – Explorer Fish",series:"SpongeBob Bikini Bottom 2",ip:"SPONGEBOB",type:"figure",qty:1,claimable:true},
+  {id:"pr-bag",name:"Peach Riot Rush Hour – Shoulder Bag",series:"Peach Riot Rush Hour",ip:"PEACH RIOT",type:"accessory",qty:2,claimable:true},
+  {id:"pr-cup",name:"Peach Riot Rush Hour – Straw Cup",series:"Peach Riot Rush Hour",ip:"PEACH RIOT",type:"accessory",qty:1,claimable:true},
+  {id:"chaka-cw-voyage",name:"CHAKA Candlelit Wander – Voyage Through Pages",series:"CHAKA Candlelit Wander",ip:"CHAKA",type:"figure",qty:1,claimable:true},
+  {id:"chaka-cw-starry",name:"CHAKA Candlelit Wander – Starry Conductor",series:"CHAKA Candlelit Wander",ip:"CHAKA",type:"figure",qty:1,claimable:true},
+  {id:"yoki-star-globe",name:"YOKI Star Globe Figurine (by Yoyo Yeung)",series:"YOKI Star Globe",ip:"YOKI",type:"figure",qty:1,claimable:true},
+  {id:"fifa-deal",name:"FIFA Bottle Opener – Deal the Victory",series:"POP MART × FIFA",ip:"FIFA",type:"accessory",qty:1,claimable:true},
+  {id:"fifa-seal",name:"FIFA Bottle Opener – Seal the Victory",series:"POP MART × FIFA",ip:"FIFA",type:"accessory",qty:1,claimable:true},
+  {id:"display",name:"Figurine Display Box",series:"Storage / Display",ip:"OTHER",type:"display",qty:2,claimable:true},
+];
+
+let items=[], claims={}, isAdmin=false, pendingClaimId=null, pendingRejectId=null, addRows=[{name:'',type:'figure',qty:1}];
+
+async function loadData(){
+  const [ir,cr]=await Promise.all([db.from('items').select('*'),db.from('claims').select('*')]);
+  if(!ir.data||ir.data.length===0){await db.from('items').insert(SEED);items=SEED;}
+  else items=ir.data;
+  claims={};
+  (cr.data||[]).forEach(c=>{claims[c.item_id]=c;});
+}
+
+function showSaving(){document.getElementById('savingPill').style.display='inline';}
+function hideSaving(){document.getElementById('savingPill').style.display='none';}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+async function notify(payload){
+  try{await fetch(NOTIFY_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${SUPABASE_KEY}`},body:JSON.stringify(payload)});}
+  catch(e){console.error('notify failed',e);}
+}
+
+function buildStats(){
+  const total=items.reduce((s,i)=>s+i.qty,0),ips=new Set(items.map(i=>i.ip)).size,
+    figures=items.filter(i=>i.type==='figure').reduce((s,i)=>s+i.qty,0),
+    plush=items.filter(i=>i.type==='plush').reduce((s,i)=>s+i.qty,0);
+  document.getElementById('stats').innerHTML=[["pieces",total],["unique",items.length],["IPs",ips],["figures",figures],["plush",plush]]
+    .map(([l,v])=>`<div class="stat"><div class="stat-val">${v}</div><div class="stat-label">${l}</div></div>`).join('');
+}
+
+function buildIPFilter(){
+  const sel=document.getElementById('filterIP'),cur=sel.value;
+  sel.innerHTML='<option value="ALL">all IPs</option>';
+  [...new Set(items.map(i=>i.ip))].sort().forEach(ip=>{const o=document.createElement('option');o.value=ip;o.textContent=ip;sel.appendChild(o);});
+  sel.value=cur;
+}
+
+function render(){
+  const q=document.getElementById('search').value.toLowerCase(),
+    ipF=document.getElementById('filterIP').value,
+    typeF=document.getElementById('filterType').value,
+    sort=document.getElementById('sortBy').value;
+  let filtered=[...items].filter(i=>{
+    if(q&&!i.name.toLowerCase().includes(q)&&!i.ip.toLowerCase().includes(q)&&!i.series.toLowerCase().includes(q))return false;
+    if(ipF!=='ALL'&&i.ip!==ipF)return false;
+    if(typeF!=='ALL'&&i.type!==typeF)return false;
+    return true;
+  });
+  filtered.sort((a,b)=>{
+    if(sort==='ip')return a.ip.localeCompare(b.ip)||a.name.localeCompare(b.name);
+    if(sort==='name')return a.name.localeCompare(b.name);
+    if(sort==='qty')return b.qty-a.qty;
+    if(sort==='type')return a.type.localeCompare(b.type);
+    return 0;
+  });
+  document.getElementById('count').textContent=`SHOWING ${filtered.length} ITEMS`;
+  const list=document.getElementById('list');list.innerHTML='';
+  if(!filtered.length){list.innerHTML='<div class="empty">NO ITEMS FOUND</div>';return;}
+  if(sort==='ip'){
+    const groups={};filtered.forEach(i=>{if(!groups[i.ip])groups[i.ip]=[];groups[i.ip].push(i);});
+    Object.entries(groups).forEach(([ip,arr])=>{
+      const gh=document.createElement('div');gh.className='group-header';
+      gh.innerHTML=`<div class="group-line"></div><div class="group-name">${esc(ip)}</div><div class="group-count">${arr.reduce((s,i)=>s+i.qty,0)} pcs</div><div class="group-line"></div>`;
+      list.appendChild(gh);arr.forEach(item=>list.appendChild(makeRow(item)));
+    });
+  } else filtered.forEach(item=>list.appendChild(makeRow(item)));
+  buildStats();
+}
+
+function makeRow(item){
+  const claim=claims[item.id],isDupe=item.qty>1,claimable=item.claimable!==false;
+  const row=document.createElement('div');
+  let claimCell='<span></span>';
+  if(claim&&claim.status==='accepted'){
+    row.className='item-row is-claimed';
+    claimCell=`<span class="claimed-badge">✓ claimed by ${esc(claim.name)}</span>`;
+  } else if(claim&&claim.status==='pending'){
+    row.className='item-row is-dupe';
+    claimCell=`<span class="pending-badge">⏳ ${esc(claim.name)}</span>`;
+  } else if(claim&&claim.status==='rejected'){
+    row.className='item-row';
+    claimCell=`<span class="rejected-badge">✕ ${claim.rejection_reason?esc(claim.rejection_reason):'not available'}</span>`;
+  } else if(isDupe&&claimable){
+    row.className='item-row is-dupe';
+    claimCell=`<button class="claim-btn" onclick="openClaimModal('${item.id}')">request dupe</button>`;
+  } else {
+    row.className='item-row';
+  }
+  const qtyCell=isAdmin
+    ?`<div class="qty-ctrl"><button class="qty-btn" onclick="adjustQty('${item.id}',-1)">−</button><span class="qty-num${item.qty===0?' zero':''}" onclick="editQty('${item.id}')">×${item.qty}</span><button class="qty-btn" onclick="adjustQty('${item.id}',1)">+</button></div>`
+    :`<div class="qty-badge${item.qty===0?' zero':''}">×${item.qty}</div>`;
+  const adminCells=isAdmin
+    ?`<button class="toggle-claim-btn ${claimable?'on':'off'}" onclick="toggleClaimable('${item.id}')">${claimable?'claimable':'blocked'}</button><button class="delete-btn admin-only" onclick="deleteItem('${item.id}')">✕</button>`
+    :`<span></span><span></span>`;
+  row.innerHTML=`
+    <div><div class="item-name">${esc(item.name)}</div><div class="item-series">${esc(item.series)}</div></div>
+    <span class="type-pill type-${item.type}">${TYPE_EMOJI[item.type]||''} ${item.type}</span>
+    ${claimCell}${qtyCell}${adminCells}`;
+  return row;
+}
+
+// ── CLAIMS ──
+function openClaimModal(id){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  pendingClaimId=id;
+  document.getElementById('claimModalTitle').textContent=item.name;
+  document.getElementById('claimName').value='';
+  document.getElementById('claimEmail').value='';
+  document.getElementById('claimModal').classList.add('open');
+  setTimeout(()=>document.getElementById('claimName').focus(),100);
+}
+function closeClaimModal(){document.getElementById('claimModal').classList.remove('open');pendingClaimId=null;}
+document.getElementById('claimName').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('claimEmail').focus();});
+
+async function submitClaim(){
+  const name=document.getElementById('claimName').value.trim();
+  const email=document.getElementById('claimEmail').value.trim();
+  if(!name){document.getElementById('claimName').focus();return;}
+  if(!email){document.getElementById('claimEmail').focus();return;}
+  if(!pendingClaimId)return;
+  const item=items.find(i=>i.id===pendingClaimId);
+  showSaving();
+  const {error}=await db.from('claims').upsert({item_id:pendingClaimId,status:'pending',name,email,time:new Date().toLocaleString()});
+  if(error){hideSaving();toast('error sending request');return;}
+  claims[pendingClaimId]={item_id:pendingClaimId,status:'pending',name,email,time:new Date().toLocaleString()};
+  await notify({type:'new_claim',itemName:item.name,requesterName:name,requesterEmail:email});
+  hideSaving();closeClaimModal();render();toast('request sent ✓');
+}
+
+// ── ADMIN AUTH ──
+function openAdmin(){
+  document.getElementById('adminModal').classList.add('open');
+  if(isAdmin){renderAdminRequests();return;}
+  document.getElementById('adminPw').value='';
+  document.getElementById('pwError').textContent='';
+  setTimeout(()=>document.getElementById('adminPw').focus(),100);
+}
+function closeAdmin(){document.getElementById('adminModal').classList.remove('open');}
+
+async function checkPw(){
+  const input=document.getElementById('adminPw').value;
+  if(!input)return;
+  const hash=md5(input);
+  const {data,error}=await db.from('config').select('value').eq('key','admin_pw_hash').single();
+  if(error||!data){document.getElementById('pwError').textContent='error checking password';return;}
+  if(hash===data.value){
+    isAdmin=true;document.body.classList.add('is-admin');
+    document.getElementById('addBtn').style.cssText='display:flex!important;padding:9px 16px;font-size:11px;font-family:Syne Mono,monospace;letter-spacing:1px;flex:0';
+    renderAdminRequests();render();
+  } else {
+    document.getElementById('pwError').textContent='incorrect password';
+    document.getElementById('adminPw').value='';document.getElementById('adminPw').focus();
+  }
+}
+
+function logoutAdmin(){
+  isAdmin=false;document.body.classList.remove('is-admin');
+  document.getElementById('addBtn').style.cssText='';
+  closeAdmin();render();toast('admin logged out');
+}
+
+function renderAdminRequests(){
+  document.getElementById('adminSub').textContent='manage claims · inventory editing unlocked';
+  const entries=Object.entries(claims),pending=entries.filter(([,c])=>c.status==='pending'),done=entries.filter(([,c])=>c.status!=='pending');
+  let html='';
+  if(!entries.length)html='<div class="no-requests">NO REQUESTS YET</div>';
+  else {
+    if(pending.length){
+      html+=`<div class="section-head">PENDING (${pending.length})</div>`;
+      pending.forEach(([id,c])=>{
+        const item=items.find(i=>i.id===id);
+        html+=`<div class="request-card"><div><div class="req-item">${item?esc(item.name):id}</div><div class="req-name">${esc(c.name)} · ${esc(c.email||'')}</div><div class="req-time">${c.time}</div></div><div style="display:flex;gap:8px;align-items:center"><button class="btn-accept" onclick="resolveClaim('${id}','accepted')">accept</button><button class="btn-reject" onclick="openRejectModal('${id}')">reject</button></div></div>`;
+      });
+    }
+    if(done.length){
+      html+=`<div class="section-head">RESOLVED (${done.length})</div>`;
+      done.forEach(([id,c])=>{
+        const item=items.find(i=>i.id===id);
+        html+=`<div class="request-card ${c.status}"><div><div class="req-item">${item?esc(item.name):id}</div><div class="req-name">${c.status==='accepted'?'✓ claimed by':'✕ rejected:'} ${esc(c.name)}${c.rejection_reason?` — ${esc(c.rejection_reason)}`:''}</div><div class="req-time">${c.time}</div></div><div><button class="btn-reject" onclick="removeClaim('${id}')">remove</button></div></div>`;
+      });
+    }
+  }
+  html+=`<div class="modal-btns" style="margin-top:18px"><button class="btn-ghost" onclick="closeAdmin()">close</button><button class="btn-ghost" onclick="logoutAdmin()" style="color:#ef4444;border-color:#ef4444">logout admin</button></div>`;
+  document.getElementById('adminContent').innerHTML=html;
+}
+
+// ── REJECT WITH REASON ──
+function openRejectModal(id){pendingRejectId=id;document.getElementById('rejectReason').value='';document.getElementById('rejectModal').classList.add('open');}
+function closeRejectModal(){document.getElementById('rejectModal').classList.remove('open');pendingRejectId=null;}
+async function confirmReject(){
+  if(!pendingRejectId)return;
+  const reason=document.getElementById('rejectReason').value.trim();
+  await resolveClaim(pendingRejectId,'rejected',reason);
+  closeRejectModal();
+}
+
+async function resolveClaim(id,status,reason=''){
+  showSaving();
+  await db.from('claims').update({status,rejection_reason:reason||null}).eq('item_id',id);
+  hideSaving();
+  const c=claims[id];c.status=status;c.rejection_reason=reason;
+  const item=items.find(i=>i.id===id);
+  if(c.email){await notify({type:status,itemName:item?item.name:id,requesterName:c.name,requesterEmail:c.email,rejectionReason:reason});}
+  render();renderAdminRequests();toast(status==='accepted'?'✓ accepted':'rejected');
+}
+
+async function removeClaim(id){
+  showSaving();await db.from('claims').delete().eq('item_id',id);hideSaving();
+  delete claims[id];render();renderAdminRequests();
+}
+
+// ── INVENTORY EDITING ──
+async function adjustQty(id,delta){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  const qty=Math.max(0,item.qty+delta);showSaving();
+  await db.from('items').update({qty}).eq('id',id);hideSaving();
+  item.qty=qty;render();
+}
+async function editQty(id){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  const v=prompt(`qty for ${item.name}:`,item.qty);if(v===null)return;
+  const n=parseInt(v);if(isNaN(n)||n<0){toast('invalid qty');return;}
+  showSaving();await db.from('items').update({qty:n}).eq('id',id);hideSaving();
+  item.qty=n;render();
+}
+async function toggleClaimable(id){
+  const item=items.find(i=>i.id===id);if(!item)return;
+  const val=!(item.claimable!==false);showSaving();
+  await db.from('items').update({claimable:val}).eq('id',id);hideSaving();
+  item.claimable=val;render();
+}
+async function deleteItem(id){
+  const item=items.find(i=>i.id===id);
+  if(!confirm(`remove "${item.name}"?`))return;
+  showSaving();await db.from('items').delete().eq('id',id);hideSaving();
+  items=items.filter(i=>i.id!==id);delete claims[id];
+  buildIPFilter();render();toast(`removed ${item.name}`);
+}
+
+// ── ADD ITEMS ──
+function buildAddIPDropdown(){
+  const sel=document.getElementById('addIP');
+  ALL_IPS.forEach(ip=>{const o=document.createElement('option');o.value=ip;o.textContent=ip;sel.appendChild(o);});
+  const c=document.createElement('option');c.value='__custom__';c.textContent='+ type custom…';sel.appendChild(c);
+}
+function toggleCustomIP(){document.getElementById('addCustomIP').style.display=document.getElementById('addIP').value==='__custom__'?'block':'none';}
+function renderAddRows(){
+  const c=document.getElementById('addRowsContainer');c.innerHTML='';
+  addRows.forEach((row,idx)=>{
+    const d=document.createElement('div');d.className='add-row';
+    d.innerHTML=`<input type="text" placeholder="item name ${idx+1}" value="${esc(row.name)}" oninput="addRows[${idx}].name=this.value"/><select class="type-sel" onchange="addRows[${idx}].type=this.value">${['figure','plush','accessory','display','cup'].map(t=>`<option${row.type===t?' selected':''}>${t}</option>`).join('')}</select><input type="number" min="1" class="qty-input" value="${row.qty}" oninput="addRows[${idx}].qty=parseInt(this.value)||1"/>${addRows.length>1?`<button class="row-x" onclick="removeRow(${idx})">✕</button>`:''}`;
+    c.appendChild(d);
+  });
+}
+function addRow(){addRows.push({name:'',type:'figure',qty:1});renderAddRows();}
+function removeRow(idx){addRows=addRows.filter((_,i)=>i!==idx);renderAddRows();}
+function openAddModal(){
+  document.getElementById('addModal').classList.add('open');
+  document.getElementById('addIP').value='';
+  document.getElementById('addCustomIP').value='';
+  document.getElementById('addCustomIP').style.display='none';
+  document.getElementById('addSeries').value='';
+  addRows=[{name:'',type:'figure',qty:1}];renderAddRows();
+}
+function closeAddModal(){document.getElementById('addModal').classList.remove('open');}
+async function saveItems(){
+  let ip=document.getElementById('addIP').value;
+  if(ip==='__custom__')ip=document.getElementById('addCustomIP').value.trim().toUpperCase();
+  if(!ip){toast('select an IP');return;}
+  const series=document.getElementById('addSeries').value.trim();
+  const valid=addRows.filter(r=>r.name.trim());
+  if(!valid.length){toast('add at least one item name');return;}
+  const newItems=valid.map(r=>({
+    id:`custom-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
+    name:series?`${series} – ${r.name.trim()}`:`${ip} – ${r.name.trim()}`,
+    series:series||ip,ip,type:r.type,qty:parseInt(r.qty)||1,claimable:true
+  }));
+  showSaving();await db.from('items').insert(newItems);hideSaving();
+  items=[...items,...newItems];buildIPFilter();render();closeAddModal();
+  toast(`added ${newItems.length} item${newItems.length>1?'s':''} ✓`);
+}
+
+// ── MD5 (inline, no CDN needed) ──
+function md5(s){function L(k,d){return(k<<d)|(k>>>(32-d))}function K(G,k){var I,d,F,H,x;F=(G&2147483648);H=(k&2147483648);I=(G&1073741824);d=(k&1073741824);x=(G&1073741823)+(k&1073741823);if(I&d){return(x^2147483648^F^H)}if(I|d){if(x&1073741824){return(x^3221225472^F^H)}else{return(x^1073741824^F^H)}}else{return(x^F^H)}}function r(d,F,k){return(d&F)|((~d)&k)}function q(d,F,k){return(d&k)|(F&(~k))}function p(d,F,k){return(d^F^k)}function n(d,F,k){return(F^(d|(~k)))}function u(G,F,aa,Z,k,H,I){G=K(G,K(K(r(F,aa,Z),k),I));return K(L(G,H),F)}function f(G,F,aa,Z,k,H,I){G=K(G,K(K(q(F,aa,Z),k),I));return K(L(G,H),F)}function D(G,F,aa,Z,k,H,I){G=K(G,K(K(p(F,aa,Z),k),I));return K(L(G,H),F)}function t(G,F,aa,Z,k,H,I){G=K(G,K(K(n(F,aa,Z),k),I));return K(L(G,H),F)}function e(G){var Z;var F=G.length;var x=F+8;var k=(x-(x%64))/64;var I=(k+1)*16;var aa=Array(I-1);var d=0;var H=0;while(H<F){Z=(H-(H%4))/4;d=(H%4)*8;aa[Z]=(aa[Z]|(G.charCodeAt(H)<<d));H++}Z=(H-(H%4))/4;d=(H%4)*8;aa[Z]=aa[Z]|(128<<d);aa[I-2]=F<<3;aa[I-1]=F>>>29;return aa}function B(x){var k="",F="",G,d;for(d=0;d<=3;d++){G=(x>>>(d*8))&255;F="0"+G.toString(16);k=k+F.substr(F.length-2,2)}return k}function J(k){k=k.replace(/\r\n/g,"\n");var d="";for(var F=0;F<k.length;F++){var x=k.charCodeAt(F);if(x<128){d+=String.fromCharCode(x)}else if((x>127)&&(x<2048)){d+=String.fromCharCode((x>>6)|192);d+=String.fromCharCode((x&63)|128)}else{d+=String.fromCharCode((x>>12)|224);d+=String.fromCharCode(((x>>6)&63)|128);d+=String.fromCharCode((x&63)|128)}}return d}var C=Array();var P,h,E,v,g,Y,M,X,W;var S=7,Q=12,N=17,U=22,A=5,z=9,y=14,w=20,o=4,m=11,l=16,j=23,U1=6,T=10,R=15,O=21;s=J(s);C=e(s);Y=1732584193;M=4023233417;X=2562383102;W=271733878;for(P=0;P<C.length;P+=16){h=Y;E=M;v=X;g=W;Y=u(Y,M,X,W,C[P+0],S,3614090360);W=u(W,Y,M,X,C[P+1],Q,3905402710);X=u(X,W,Y,M,C[P+2],N,606105819);M=u(M,X,W,Y,C[P+3],U,3250441966);Y=u(Y,M,X,W,C[P+4],S,4118548399);W=u(W,Y,M,X,C[P+5],Q,1200080426);X=u(X,W,Y,M,C[P+6],N,2821735955);M=u(M,X,W,Y,C[P+7],U,4249261313);Y=u(Y,M,X,W,C[P+8],S,1770035416);W=u(W,Y,M,X,C[P+9],Q,2336552879);X=u(X,W,Y,M,C[P+10],N,4294925233);M=u(M,X,W,Y,C[P+11],U,2304563134);Y=u(Y,M,X,W,C[P+12],S,1804603682);W=u(W,Y,M,X,C[P+13],Q,4254626195);X=u(X,W,Y,M,C[P+14],N,2792965006);M=u(M,X,W,Y,C[P+15],U,1236535329);Y=f(Y,M,X,W,C[P+1],A,4129170786);W=f(W,Y,M,X,C[P+6],z,3225465664);X=f(X,W,Y,M,C[P+11],y,643717713);M=f(M,X,W,Y,C[P+0],w,3921069994);Y=f(Y,M,X,W,C[P+5],A,3593408605);W=f(W,Y,M,X,C[P+10],z,38016083);X=f(X,W,Y,M,C[P+15],y,3634488961);M=f(M,X,W,Y,C[P+4],w,3889429448);Y=f(Y,M,X,W,C[P+9],A,568446438);W=f(W,Y,M,X,C[P+14],z,3275163606);X=f(X,W,Y,M,C[P+3],y,4107603335);M=f(M,X,W,Y,C[P+8],w,1163531501);Y=f(Y,M,X,W,C[P+13],A,2850285829);W=f(W,Y,M,X,C[P+2],z,4243563512);X=f(X,W,Y,M,C[P+7],y,1735328473);M=f(M,X,W,Y,C[P+12],w,2368359562);Y=D(Y,M,X,W,C[P+5],o,4294588738);W=D(W,Y,M,X,C[P+8],m,2272392833);X=D(X,W,Y,M,C[P+11],l,1839030562);M=D(M,X,W,Y,C[P+14],j,4259657740);Y=D(Y,M,X,W,C[P+1],o,2763975236);W=D(W,Y,M,X,C[P+4],m,1272893353);X=D(X,W,Y,M,C[P+7],l,4139469664);M=D(M,X,W,Y,C[P+10],j,3200236656);Y=D(Y,M,X,W,C[P+13],o,681279174);W=D(W,Y,M,X,C[P+0],m,3936430074);X=D(X,W,Y,M,C[P+3],l,3572445317);M=D(M,X,W,Y,C[P+6],j,76029189);Y=D(Y,M,X,W,C[P+9],o,3654602809);W=D(W,Y,M,X,C[P+12],m,3873151461);X=D(X,W,Y,M,C[P+15],l,530742520);M=D(M,X,W,Y,C[P+2],j,3299628645);Y=t(Y,M,X,W,C[P+0],U1,4096336452);W=t(W,Y,M,X,C[P+7],T,1126891415);X=t(X,W,Y,M,C[P+14],R,2878612391);M=t(M,X,W,Y,C[P+5],O,4237533241);Y=t(Y,M,X,W,C[P+12],U1,1700485571);W=t(W,Y,M,X,C[P+3],T,2399980690);X=t(X,W,Y,M,C[P+10],R,4293915773);M=t(M,X,W,Y,C[P+1],O,2240044497);Y=t(Y,M,X,W,C[P+8],U1,1873313359);W=t(W,Y,M,X,C[P+15],T,4264355552);X=t(X,W,Y,M,C[P+6],R,2734768916);M=t(M,X,W,Y,C[P+13],O,1309151649);Y=t(Y,M,X,W,C[P+4],U1,4149444226);W=t(W,Y,M,X,C[P+11],T,3174756917);X=t(X,W,Y,M,C[P+2],R,718787259);M=t(M,X,W,Y,C[P+9],O,3951481745);Y=K(Y,h);M=K(M,E);X=K(X,v);W=K(W,g)}var i=B(Y)+B(M)+B(X)+B(W);return i.toLowerCase()}
+
+// ── BOOT ──
+buildAddIPDropdown();
+loadData().then(()=>{
+  buildIPFilter();render();
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+});
+</script>
+</body>
+</html>
